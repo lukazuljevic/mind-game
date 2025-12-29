@@ -8,7 +8,6 @@ class GameManager {
   private playerRooms: Map<string, string> = new Map();
 
   constructor() {
-    // Start the cleanup interval
     setInterval(() => this.cleanupExpiredRooms(), CLEANUP_INTERVAL_MS);
   }
 
@@ -25,7 +24,6 @@ class GameManager {
     expiredCodes.forEach((code) => {
       const room = this.rooms.get(code);
       if (room) {
-        // Remove all player mappings for this room
         room.players.forEach((player) => {
           this.playerRooms.delete(player.id);
         });
@@ -160,7 +158,6 @@ class GameManager {
     room.state.playedCards = [];
     room.state.currentCard = null;
 
-    // Reset player fails when starting a new game
     room.players.forEach((p) => {
       p.fails = 0;
     });
@@ -235,11 +232,9 @@ class GameManager {
     let levelComplete = false;
 
     if (lostCards.length > 0) {
-      // Increment the player's fail count
       player.fails++;
       lostLife = true;
       
-      // Reset the level - re-deal cards
       room.state.playedCards = [];
       room.state.currentCard = null;
       this.dealCards(room);
