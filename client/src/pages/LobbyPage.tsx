@@ -76,8 +76,6 @@ function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
           <h4>Game Rules</h4>
           <ul>
             <li>Play cards in ascending order (1-100)</li>
-            <li>No talking or signaling allowed!</li>
-            <li>Trust your intuition and timing</li>
             <li>Each level adds more cards per player</li>
             <li>Complete all 12 levels to win!</li>
           </ul>

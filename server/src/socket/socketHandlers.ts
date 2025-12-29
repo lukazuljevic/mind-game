@@ -6,7 +6,6 @@ export function setupSocketHandlers(
   io: Server<ClientToServerEvents, ServerToClientEvents>
 ): void {
   
-  // Helper to broadcast updated room list
   const broadcastRoomList = () => {
     const rooms = gameManager.getAllRooms();
     io.emit('rooms-list', { rooms });
@@ -15,7 +14,6 @@ export function setupSocketHandlers(
   io.on('connection', (socket: Socket<ClientToServerEvents, ServerToClientEvents>) => {
     console.log(`Player connected: ${socket.id}`);
     
-    // Send current room list on connect
     socket.emit('rooms-list', { rooms: gameManager.getAllRooms() });
 
     socket.on('get-rooms', () => {
@@ -30,7 +28,6 @@ export function setupSocketHandlers(
       socket.emit('room-created', { roomCode: room.code, player: player! });
       console.log(`Room ${room.code} created by ${playerName}`);
       
-      // Broadcast updated room list to all clients
       broadcastRoomList();
     });
 
@@ -49,7 +46,6 @@ export function setupSocketHandlers(
       socket.to(room.code).emit('player-joined', { player: player! });
       console.log(`${playerName} joined room ${room.code}`);
       
-      // Broadcast updated room list
       broadcastRoomList();
     });
 
@@ -75,7 +71,6 @@ export function setupSocketHandlers(
         io.to(roomCode).emit('game-started', { room: startedRoom });
         console.log(`Game started in room ${roomCode}`);
         
-        // Room is no longer in waiting state, update list
         broadcastRoomList();
       }
     });
@@ -127,7 +122,6 @@ export function setupSocketHandlers(
     socket.on('disconnect', () => {
       console.log(`Player disconnected: ${socket.id}`);
       
-      // Find and leave any room the player was in
       const room = gameManager.getRoomByPlayerId(socket.id);
       if (room) {
         handlePlayerLeave(socket, room.code);
@@ -141,7 +135,6 @@ export function setupSocketHandlers(
       if (!deleted && room) {
         socket.to(roomCode).emit('player-left', { playerId: socket.id });
         
-        // Notify about new host if host changed
         if (newHost) {
           io.to(roomCode).emit('host-changed', { 
             newHostId: newHost.id, 
@@ -149,7 +142,6 @@ export function setupSocketHandlers(
           });
         }
         
-        // If game ended due to player leaving
         if (room.state.status === 'lost') {
           io.to(roomCode).emit('game-over', { room, won: false });
         }
@@ -157,7 +149,6 @@ export function setupSocketHandlers(
         io.to(roomCode).emit('game-state-sync', { room });
       }
       
-      // Broadcast updated room list
       broadcastRoomList();
     }
   });

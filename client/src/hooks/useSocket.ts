@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { GameRoom, Player, RoomInfo } from '../types';
 
-const SOCKET_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SOCKET_URL = window.location.origin
+//const SOCKET_URL = 'http://localhost:9998';
 
 interface ServerToClientEvents {
   'room-created': (data: { roomCode: string; player: Player }) => void;

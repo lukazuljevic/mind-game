@@ -1,5 +1,3 @@
-// Game Types for The Mind
-
 export interface Player {
   id: string;
   name: string;

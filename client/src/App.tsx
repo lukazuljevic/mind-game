@@ -122,7 +122,6 @@ function App() {
       const me = syncedRoom.players.find((p) => p.id === player?.id);
       if (me) setPlayer(me);
       
-      // If game ended due to player leaving
       if (syncedRoom.state.status === 'lost' && screen === 'game') {
         showNotification('💀 Game Over - not enough players');
       }

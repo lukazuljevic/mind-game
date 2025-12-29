@@ -10,7 +10,7 @@ const httpServer = createServer(app);
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: ['mind.zulja.org', 'http://localhost:5173'],
     methods: ['GET', 'POST'],
   },
 });
@@ -18,16 +18,14 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Setup socket handlers
 setupSocketHandlers(io);
 
 const PORT = 9998;
 
 httpServer.listen(PORT, () => {
-  console.log(`🎮 The Mind Game server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

@@ -2,7 +2,7 @@ import { GameRoom, Player, RoomInfo } from '../types';
 
 class GameManager {
   private rooms: Map<string, GameRoom> = new Map();
-  private playerRooms: Map<string, string> = new Map(); // playerId -> roomCode
+  private playerRooms: Map<string, string> = new Map();
 
   generateRoomCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -10,7 +10,6 @@ class GameManager {
     for (let i = 0; i < 4; i++) {
       code += chars[Math.floor(Math.random() * chars.length)];
     }
-    // Ensure unique code
     if (this.rooms.has(code)) {
       return this.generateRoomCode();
     }
@@ -74,7 +73,6 @@ class GameManager {
     const room = this.rooms.get(code);
     if (!room) return null;
     if (room.state.status !== 'waiting') return null;
-    // No player limit - allow any number of players
 
     const player: Player = {
       id: playerId,
@@ -102,14 +100,12 @@ class GameManager {
 
     let newHost: Player | undefined;
 
-    // If host left, assign new host
     if (room.hostId === playerId) {
       room.hostId = room.players[0].id;
       room.players[0].isHost = true;
       newHost = room.players[0];
     }
 
-    // If game was in progress and only 1 player left, end the game
     if (room.state.status === 'playing' && room.players.length < 2) {
       room.state.status = 'lost';
     }
@@ -137,7 +133,6 @@ class GameManager {
     const cardsPerPlayer = room.state.level;
     const totalCards = playerCount * cardsPerPlayer;
 
-    // Generate unique random cards from 1-100
     const allCards: number[] = [];
     while (allCards.length < totalCards) {
       const card = Math.floor(Math.random() * 100) + 1;
@@ -146,16 +141,13 @@ class GameManager {
       }
     }
 
-    // Sort and distribute
     allCards.sort((a, b) => a - b);
     
-    // Shuffle for distribution
     for (let i = allCards.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [allCards[i], allCards[j]] = [allCards[j], allCards[i]];
     }
 
-    // Deal to players
     room.players.forEach((player, index) => {
       player.cards = allCards
         .filter((_, i) => i % playerCount === index)
@@ -180,10 +172,9 @@ class GameManager {
     const player = room.players.find((p) => p.id === playerId);
     if (!player || player.cards.length === 0) return { success: false };
 
-    const playedCard = player.cards[0]; // Always play lowest card
+    const playedCard = player.cards[0]; 
     player.cards = player.cards.slice(1);
 
-    // Check if any other player has a lower card
     const lostCards: number[] = [];
     room.players.forEach((p) => {
       if (p.id !== playerId) {
@@ -205,7 +196,6 @@ class GameManager {
     if (lostCards.length > 0) {
       room.state.lives--;
       lostLife = true;
-      // Add lost cards to played pile
       room.state.playedCards.push(...lostCards);
       room.state.playedCards.sort((a, b) => a - b);
 
@@ -215,7 +205,6 @@ class GameManager {
       }
     }
 
-    // Check if level is complete
     const totalCardsRemaining = room.players.reduce((sum, p) => sum + p.cards.length, 0);
     if (totalCardsRemaining === 0 && !gameLost) {
       if (room.state.level >= 12) {

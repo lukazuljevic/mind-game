@@ -180,7 +180,6 @@
   to { transform: rotate(360deg); }
 }
 
-/* Game Rules */
 .game-rules {
   background: var(--bg-glass);
 }
