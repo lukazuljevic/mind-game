@@ -26,7 +26,7 @@ function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
         </div>
 
         <div className="players-section card">
-          <h3>Players ({room.players.length}/4)</h3>
+          <h3>Players ({room.players.length})</h3>
           <div className="players-list">
             {room.players.map((p) => (
               <div 
@@ -45,13 +45,6 @@ function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
                 </div>
               </div>
             ))}
-            
-            {room.players.length < 4 && (
-              <div className="player-item player-empty">
-                <div className="player-avatar empty">?</div>
-                <span className="waiting-text">Waiting for player...</span>
-              </div>
-            )}
           </div>
         </div>
 

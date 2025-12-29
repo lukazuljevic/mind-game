@@ -15,6 +15,7 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
   const myCards = player.cards;
   const canPlay = myCards.length > 0 && state.status === 'playing';
   const isGameOver = state.status === 'won' || state.status === 'lost';
+  const totalFails = room.players.reduce((sum, p) => sum + p.fails, 0);
 
   return (
     <div className="game-page">
@@ -28,10 +29,8 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
             <span className="stat-value">{state.level}</span>
           </div>
           <div className="stat">
-            <span className="stat-label">Lives</span>
-            <span className="stat-value hearts">
-              {'❤️'.repeat(state.lives)}{'🖤'.repeat(Math.max(0, 3 - state.lives))}
-            </span>
+            <span className="stat-label">Fails</span>
+            <span className="stat-value">{totalFails}</span>
           </div>
         </div>
       </div>
@@ -43,6 +42,7 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
             <div key={p.id} className="other-player">
               <div className="player-avatar-small">
                 {p.name.charAt(0).toUpperCase()}
+                {p.fails > 0 && <span className="fail-badge">{p.fails}</span>}
               </div>
               <span className="player-name-small">{p.name}</span>
               <div className="card-count">
@@ -99,7 +99,10 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
 
       {/* My hand */}
       <div className="my-hand-section">
-        <div className="hand-label">Your Cards</div>
+        <div className="hand-label">
+          Your Cards
+          {player.fails > 0 && <span className="my-fail-badge">{player.fails}</span>}
+        </div>
         <div className="my-hand">
           {myCards.length > 0 ? (
             myCards.map((card, index) => (

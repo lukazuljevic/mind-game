@@ -95,6 +95,7 @@
   justify-content: center;
   font-weight: 600;
   font-size: 0.875rem;
+  position: relative;
 }
 
 .player-name-small {
@@ -108,6 +109,24 @@
   padding: 2px 8px;
   background: var(--bg-secondary);
   border-radius: var(--radius-full);
+}
+
+.fail-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Play Area */
@@ -200,6 +219,21 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.my-fail-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: none;
+  letter-spacing: normal;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .my-hand {

@@ -3,6 +3,7 @@ export interface Player {
   name: string;
   cards: number[];
   isHost: boolean;
+  fails: number;
 }
 
 export interface GameRoom {
@@ -10,12 +11,12 @@ export interface GameRoom {
   players: Player[];
   state: GameState;
   hostId: string;
+  createdAt: number;
 }
 
 export interface GameState {
   status: 'waiting' | 'playing' | 'won' | 'lost';
   level: number;
-  lives: number;
   playedCards: number[];
   currentCard: number | null;
 }

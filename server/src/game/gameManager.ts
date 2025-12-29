@@ -1,8 +1,43 @@
 import { GameRoom, Player, RoomInfo } from '../types';
 
+const ROOM_EXPIRY_MS = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+const CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // Check every 30 minutes
+
 class GameManager {
   private rooms: Map<string, GameRoom> = new Map();
   private playerRooms: Map<string, string> = new Map();
+
+  constructor() {
+    // Start the cleanup interval
+    setInterval(() => this.cleanupExpiredRooms(), CLEANUP_INTERVAL_MS);
+  }
+
+  private cleanupExpiredRooms(): void {
+    const now = Date.now();
+    const expiredCodes: string[] = [];
+
+    this.rooms.forEach((room, code) => {
+      if (now - room.createdAt >= ROOM_EXPIRY_MS) {
+        expiredCodes.push(code);
+      }
+    });
+
+    expiredCodes.forEach((code) => {
+      const room = this.rooms.get(code);
+      if (room) {
+        // Remove all player mappings for this room
+        room.players.forEach((player) => {
+          this.playerRooms.delete(player.id);
+        });
+        this.rooms.delete(code);
+        console.log(`Room ${code} expired and was deleted (created ${Math.round((now - room.createdAt) / 1000 / 60)} minutes ago)`);
+      }
+    });
+
+    if (expiredCodes.length > 0) {
+      console.log(`Cleaned up ${expiredCodes.length} expired room(s)`);
+    }
+  }
 
   generateRoomCode(): string {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -23,6 +58,7 @@ class GameManager {
       name: hostName,
       cards: [],
       isHost: true,
+      fails: 0,
     };
 
     const room: GameRoom = {
@@ -31,11 +67,11 @@ class GameManager {
       state: {
         status: 'waiting',
         level: 1,
-        lives: 3,
         playedCards: [],
         currentCard: null,
       },
       hostId,
+      createdAt: Date.now(),
     };
 
     this.rooms.set(code, room);
@@ -79,6 +115,7 @@ class GameManager {
       name: playerName,
       cards: [],
       isHost: false,
+      fails: 0,
     };
 
     room.players.push(player);
@@ -120,9 +157,13 @@ class GameManager {
 
     room.state.status = 'playing';
     room.state.level = 1;
-    room.state.lives = 3;
     room.state.playedCards = [];
     room.state.currentCard = null;
+
+    // Reset player fails when starting a new game
+    room.players.forEach((p) => {
+      p.fails = 0;
+    });
 
     this.dealCards(room);
     return room;
@@ -194,15 +235,14 @@ class GameManager {
     let levelComplete = false;
 
     if (lostCards.length > 0) {
-      room.state.lives--;
+      // Increment the player's fail count
+      player.fails++;
       lostLife = true;
-      room.state.playedCards.push(...lostCards);
-      room.state.playedCards.sort((a, b) => a - b);
-
-      if (room.state.lives <= 0) {
-        room.state.status = 'lost';
-        gameLost = true;
-      }
+      
+      // Reset the level - re-deal cards
+      room.state.playedCards = [];
+      room.state.currentCard = null;
+      this.dealCards(room);
     }
 
     const totalCardsRemaining = room.players.reduce((sum, p) => sum + p.cards.length, 0);
@@ -238,13 +278,13 @@ class GameManager {
     room.state = {
       status: 'waiting',
       level: 1,
-      lives: 3,
       playedCards: [],
       currentCard: null,
     };
 
     room.players.forEach((p) => {
       p.cards = [];
+      p.fails = 0;
     });
 
     return room;

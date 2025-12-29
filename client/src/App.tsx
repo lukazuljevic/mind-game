@@ -23,15 +23,15 @@ function App() {
     onRoomCreated: (roomCode, createdPlayer) => {
       setRoom({
         code: roomCode,
-        players: [createdPlayer],
+        players: [{ ...createdPlayer, fails: 0 }],
         state: {
           status: 'waiting',
           level: 1,
-          lives: 3,
           playedCards: [],
           currentCard: null,
         },
         hostId: createdPlayer.id,
+        createdAt: Date.now(),
       });
       setPlayer(createdPlayer);
       setScreen('lobby');
