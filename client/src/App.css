@@ -46,3 +46,20 @@
   z-index: 1000;
   box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
 }
+
+@media (max-width: 640px) {
+  .notification {
+    width: 90%;
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.875rem;
+    top: var(--space-md);
+  }
+
+  .error-toast {
+    width: 90%;
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.875rem;
+    top: var(--space-md);
+    text-align: center;
+  }
+}
