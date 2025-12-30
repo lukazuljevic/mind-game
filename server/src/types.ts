@@ -19,6 +19,7 @@ export interface GameState {
   level: number;
   playedCards: number[];
   currentCard: number | null;
+  isLocked: boolean;
 }
 
 export interface RoomInfo {

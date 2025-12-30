@@ -67,6 +67,7 @@ class GameManager {
         level: 1,
         playedCards: [],
         currentCard: null,
+        isLocked: false,
       },
       hostId,
       createdAt: Date.now(),
@@ -166,6 +167,36 @@ class GameManager {
     return room;
   }
 
+  advanceLevel(code: string): GameRoom | null {
+    const room = this.rooms.get(code);
+    if (!room) return null;
+
+    if (room.state.level >= 12) {
+      room.state.status = 'won';
+      return room;
+    }
+
+    room.state.level++;
+    room.state.playedCards = [];
+    room.state.currentCard = null;
+    room.state.isLocked = false;
+    this.dealCards(room);
+    
+    return room;
+  }
+
+  resetLevel(code: string): GameRoom | null {
+    const room = this.rooms.get(code);
+    if (!room) return null;
+
+    room.state.playedCards = [];
+    room.state.currentCard = null;
+    room.state.isLocked = false;
+    this.dealCards(room);
+    
+    return room;
+  }
+
   private dealCards(room: GameRoom): void {
     const playerCount = room.players.length;
     const cardsPerPlayer = room.state.level;
@@ -205,7 +236,9 @@ class GameManager {
   } {
     const room = this.rooms.get(code);
     if (!room) return { success: false };
+    if (!room) return { success: false };
     if (room.state.status !== 'playing') return { success: false };
+    if (room.state.isLocked) return { success: false };
 
     const player = room.players.find((p) => p.id === playerId);
     if (!player || player.cards.length === 0) return { success: false };
@@ -234,23 +267,22 @@ class GameManager {
     if (lostCards.length > 0) {
       player.fails++;
       lostLife = true;
-      
-      room.state.playedCards = [];
-      room.state.currentCard = null;
-      this.dealCards(room);
+      room.state.isLocked = true;
+      // Do not reset level here anymore
     }
 
     const totalCardsRemaining = room.players.reduce((sum, p) => sum + p.cards.length, 0);
-    if (totalCardsRemaining === 0 && !gameLost) {
+    
+    // Only check for level completion/win if NO life was lost in this turn
+    if (!lostLife && totalCardsRemaining === 0 && !gameLost) {
       if (room.state.level >= 12) {
+        gameWon = true; // Still mark game won immediately if it was the last card of level 12
         room.state.status = 'won';
-        gameWon = true;
+        room.state.isLocked = true;
       } else {
-        room.state.level++;
-        room.state.playedCards = [];
-        room.state.currentCard = null;
-        this.dealCards(room);
+        // Do not advance level here anymore
         levelComplete = true;
+        room.state.isLocked = true;
       }
     }
 
@@ -275,6 +307,7 @@ class GameManager {
       level: 1,
       playedCards: [],
       currentCard: null,
+      isLocked: false,
     };
 
     room.players.forEach((p) => {

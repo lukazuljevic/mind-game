@@ -94,10 +94,24 @@ export function setupSocketHandlers(
           room: result.room,
           lostCards: result.lostCards,
         });
+        
+        // Wait 1.5s before resetting the level
+        setTimeout(() => {
+          const resetRoom = gameManager.resetLevel(roomCode);
+          if (resetRoom) {
+            io.to(roomCode).emit('game-state-sync', { room: resetRoom });
+          }
+        }, 1500);
       }
 
       if (result.levelComplete) {
-        io.to(roomCode).emit('level-complete', { room: result.room });
+        // Wait 1.5s before advancing the level
+        setTimeout(() => {
+          const nextLevelRoom = gameManager.advanceLevel(roomCode);
+          if (nextLevelRoom) {
+            io.to(roomCode).emit('level-complete', { room: nextLevelRoom });
+          }
+        }, 1500);
       }
 
       if (result.gameWon || result.gameLost) {

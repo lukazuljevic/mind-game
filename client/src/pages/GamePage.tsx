@@ -13,7 +13,7 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
   const { state } = room;
   const otherPlayers = room.players.filter((p) => p.id !== player.id);
   const myCards = player.cards;
-  const canPlay = myCards.length > 0 && state.status === 'playing';
+  const canPlay = myCards.length > 0 && state.status === 'playing' && !state.isLocked;
   const isGameOver = state.status === 'won' || state.status === 'lost';
   const totalFails = room.players.reduce((sum, p) => sum + p.fails, 0);
 

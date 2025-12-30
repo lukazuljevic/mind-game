@@ -13,8 +13,8 @@
 }
 
 .card-large {
-  width: 120px;
-  height: 160px;
+  width: 144px;
+  height: 192px;
   border-radius: var(--radius-lg);
 }
 
@@ -155,8 +155,8 @@
   }
 
   .card-large {
-    width: 90px;
-    height: 120px;
+    width: 108px;
+    height: 144px;
   }
 
   .card-large .card-number {

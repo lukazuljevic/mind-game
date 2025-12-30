@@ -10,13 +10,27 @@
   top: var(--space-lg);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--gradient-primary);
+  background: rgba(26, 26, 36, 0.95);
   color: white;
   padding: var(--space-md) var(--space-xl);
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   font-weight: 500;
   z-index: 1000;
-  box-shadow: var(--shadow-button);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(12px);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .error-toast {

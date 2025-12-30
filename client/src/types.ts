@@ -1,5 +1,3 @@
-// Game Types for The Mind Client
-
 export interface Player {
   id: string;
   name: string;
@@ -21,6 +19,7 @@ export interface GameState {
   level: number;
   playedCards: number[];
   currentCard: number | null;
+  isLocked: boolean;
 }
 
 export interface RoomInfo {

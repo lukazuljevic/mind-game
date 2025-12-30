@@ -138,8 +138,8 @@
 }
 
 .play-pile {
-  width: 140px;
-  height: 180px;
+  width: 168px;
+  height: 216px;
   border-radius: var(--radius-lg);
   border: 2px dashed var(--border-subtle);
   display: flex;
@@ -266,8 +266,8 @@
   }
 
   .play-pile {
-    width: 100px;
-    height: 140px;
+    width: 120px;
+    height: 168px;
   }
 
   .other-player {

@@ -29,6 +29,7 @@ function App() {
           level: 1,
           playedCards: [],
           currentCard: null,
+          isLocked: false,
         },
         hostId: createdPlayer.id,
         createdAt: Date.now(),
@@ -98,21 +99,21 @@ function App() {
       showNotification(`Card ${card} played!`);
     },
     onLevelComplete: (updatedRoom) => {
-      setRoom(updatedRoom);
       const me = updatedRoom.players.find((p) => p.id === player?.id);
       if (me) setPlayer(me);
       showNotification(`🎉 Level ${updatedRoom.state.level - 1} complete!`);
+      setRoom(updatedRoom);
     },
     onLifeLost: (updatedRoom, lostCards) => {
-      setRoom(updatedRoom);
       const me = updatedRoom.players.find((p) => p.id === player?.id);
       if (me) setPlayer(me);
-      showNotification(`💔 Lost a life! Cards ${lostCards.join(', ')} were skipped.`);
+      showNotification(`You lost! Cards ${lostCards.join(', ')} were skipped.`);
+      // No need to setRoom here with a timeout, the server will send game-state-sync after delay
     },
     onGameOver: (updatedRoom, won) => {
       setRoom(updatedRoom);
       if (won) {
-        showNotification('🏆 You won! Amazing synchronization!');
+        showNotification('🏆 You won! Dobro ste se sitili!');
       } else {
         showNotification('💀 Game Over! Try again.');
       }
@@ -164,7 +165,7 @@ function App() {
   return (
     <div className="app">
       {notification && (
-        <div className="notification animate-slideUp">
+        <div className="notification">
           {notification}
         </div>
       )}
