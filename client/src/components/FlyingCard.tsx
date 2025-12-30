@@ -21,7 +21,6 @@ const FlyingCard = ({ startRect, endRect, number, onComplete }: FlyingCardProps)
   });
 
   useEffect(() => {
-    // Force a reflow to ensure the starting position is applied
     requestAnimationFrame(() => {
       setStyle({
         position: 'fixed',
@@ -30,13 +29,13 @@ const FlyingCard = ({ startRect, endRect, number, onComplete }: FlyingCardProps)
         width: endRect.width,
         height: endRect.height,
         zIndex: 1000,
-        transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)', // Bouncy effect
+        transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)', 
         pointerEvents: 'none',
-        transform: 'rotate(5deg) scale(1.1)', // Add a bit of rotation/scale 
+        transform: 'rotate(5deg) scale(1.1)', 
       });
     });
 
-    const timer = setTimeout(onComplete, 600); // Match transition duration
+    const timer = setTimeout(onComplete, 600); 
     return () => clearTimeout(timer);
   }, [endRect, onComplete]);
 

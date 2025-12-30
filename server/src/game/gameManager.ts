@@ -268,19 +268,16 @@ class GameManager {
       player.fails++;
       lostLife = true;
       room.state.isLocked = true;
-      // Do not reset level here anymore
     }
 
     const totalCardsRemaining = room.players.reduce((sum, p) => sum + p.cards.length, 0);
     
-    // Only check for level completion/win if NO life was lost in this turn
     if (!lostLife && totalCardsRemaining === 0 && !gameLost) {
       if (room.state.level >= 12) {
-        gameWon = true; // Still mark game won immediately if it was the last card of level 12
+        gameWon = true; 
         room.state.status = 'won';
         room.state.isLocked = true;
       } else {
-        // Do not advance level here anymore
         levelComplete = true;
         room.state.isLocked = true;
       }

@@ -51,14 +51,14 @@ function HomePage({ availableRooms, onCreateRoom, onJoinRoom }: HomePageProps) {
                 className="btn btn-primary btn-large"
                 onClick={() => setMode('create')}
               >
-                <span className="btn-icon">✨</span>
+                <span className="btn-icon"></span>
                 Create Room
               </button>
               <button 
                 className="btn btn-secondary btn-large"
                 onClick={() => setMode('join')}
               >
-                <span className="btn-icon">🚀</span>
+                <span className="btn-icon"></span>
                 Join with Code
               </button>
             </div>

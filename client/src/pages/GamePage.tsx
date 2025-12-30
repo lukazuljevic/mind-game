@@ -30,53 +30,18 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
     card: number;
   }[]>([]);
 
-  // Track the previous card to detect *new* plays
   const prevCardRef = useRef<number | null>(null);
 
   useEffect(() => {
     const currentCard = state.currentCard;
     const prevCard = prevCardRef.current;
     
-    // Only animate if there's a new card and it's different from before
-    // AND it's not a level reset (where currentCard might become null or change abruptly)
-    // We check if currentCard is valid and actually 'new'
     if (currentCard !== null && currentCard !== prevCard) {
-      // Find who played this card? We don't have that info directly in 'state', 
-      // but we can infer it or we might need the server to send 'playerId' with state.
-      // However, App.tsx receives 'card-played' event with playerId.
-      // But GamePage relies on 'room' prop.
-      // 
-      // Workaround: We can't perfectly know WHO played it just from 'room' prop update 
-      // without extra info. Beause 'room' update replaces the state.
-      // 
-      // ALTERNATIVE: Use a ref to track card counts to guess who played? 
-      // Or just animate from "center" if unknown? 
-      // 
-      // BETTER: The user asked for "depending which player played it".
-      // 'room.state.currentCard' doesn't say who played it.
-      // But! In `App.tsx`, `onCardPlayed` updates the room. 
-      // Effect in GamePage triggers on room update.
-      // We need to know the SOURCE. 
-      //
-      // Let's deduce it: logic -> check whose card count decreased? 
-      // That's tricky if multiple events fire.
-      // 
-      // Let's just animate from "bottom" if it was me, or "top/random" if others?
-      // No, we want precision.
-      //
-      // Solution: We'll scan players to see who is missing this card in their original hand?
-      // No, we don't have history.
-      //
-      // Actually, we can assume if *my* hand lost the card, it's me.
-      // If *someone else* lost a card count, it's them.
-      // We need `prevPlayers` state to compare.
+    
     }
     prevCardRef.current = currentCard;
   }, [state.currentCard]);
 
-  // Actually, a cleaner way is to expose an `onCardPlay` event from App.tsx OR
-  // just compare the room state.
-  // Let's implement a "Previous Room" ref to compare against.
   const prevRoomRef = useRef<GameRoom>(room);
   
   useEffect(() => {
@@ -87,23 +52,14 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
       let sourceRect: DOMRect | null = null;
       let targetRect = playPileRef.current?.getBoundingClientRect();
 
-      // Check if I played it
       const myPrevCards = prevRoom.players.find(p => p.id === player.id)?.cards || [];
       const myCurrentCards = player.cards;
       
       if (myPrevCards.includes(currentCard) && !myCurrentCards.includes(currentCard)) {
-        // I played it
         sourceRect = myHandRef.current?.getBoundingClientRect() || null;
       } else {
-        // Someone else played it
         const otherPlayer = room.players.find(p => {
            if (p.id === player.id) return false;
-           // We can't see their card numbers, only count. 
-           // BUT, we know the card was played. 
-           // If their count decreased, it *might* be them.
-           // However, multpile people might play fast.
-           // 
-           // Simplified approach: Find the player whose card count decreased.
            const prevP = prevRoom.players.find(pp => pp.id === p.id);
            return prevP && prevP.cards.length > p.cards.length;
         });
@@ -150,7 +106,6 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
       </div>
 
       <div className="game-board">
-        {/* Other players */}
         <div className="other-players">
           {otherPlayers.map((p) => (
             <div 
@@ -170,7 +125,6 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
           ))}
         </div>
 
-        {/* Play pile */}
         <div className="play-area">
           <div 
             className={`play-pile ${state.currentCard ? 'has-card' : ''}`}
@@ -193,7 +147,6 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
           )}
         </div>
 
-        {/* Game over overlay */}
         {isGameOver && (
           <div className="game-over-overlay animate-fadeIn">
             <div className="game-over-card card">
@@ -218,7 +171,6 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
         )}
       </div>
 
-      {/* My hand */}
       <div className="my-hand-section">
         <div className="hand-label">
           Your Cards
@@ -246,7 +198,6 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
         )}
       </div>
       
-      {/* Render flying cards layer */}
       {flyingCards.map(fc => (
         <FlyingCard
           key={fc.id}

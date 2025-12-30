@@ -108,7 +108,6 @@ function App() {
       const me = updatedRoom.players.find((p) => p.id === player?.id);
       if (me) setPlayer(me);
       showNotification(`You lost! Cards ${lostCards.join(', ')} were skipped.`);
-      // No need to setRoom here with a timeout, the server will send game-state-sync after delay
     },
     onGameOver: (updatedRoom, won) => {
       setRoom(updatedRoom);

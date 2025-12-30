@@ -55,7 +55,7 @@ function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
               onClick={onStartGame}
               disabled={!canStart}
             >
-              {canStart ? '🚀 Start Game' : 'Need at least 2 players'}
+              {canStart ? 'Start Game' : 'Need at least 2 players'}
             </button>
           ) : (
             <div className="waiting-for-host">
