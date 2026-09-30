@@ -1,31 +1,47 @@
 .app {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   position: relative;
 }
 
-.notification {
+/* Toasts sit below the header so they never cover Exit or the stats */
+.notification,
+.error-toast {
   position: fixed;
-  top: var(--space-lg);
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(26, 26, 36, 0.95);
-  color: white;
-  padding: var(--space-md) var(--space-xl);
-  border-radius: var(--radius-md);
+  width: max-content;
+  max-width: calc(100% - 2 * var(--space-md));
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-full);
+  font-size: 0.9rem;
   font-weight: 500;
-  z-index: 1000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  text-align: center;
+  color: white;
+  z-index: 1100;
+  pointer-events: none;
+  animation: slideDown 0.25s ease-out;
+}
+
+.notification {
+  background: rgba(26, 26, 36, 0.95);
   border: 1px solid var(--border-subtle);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(12px);
-  animation: slideDown 0.3s ease-out;
+}
+
+.error-toast {
+  background: var(--danger);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
 }
 
 @keyframes slideDown {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
+    transform: translateX(-50%) translateY(-12px);
   }
   to {
     opacity: 1;
@@ -33,33 +49,16 @@
   }
 }
 
-.error-toast {
+.connection-banner {
   position: fixed;
-  top: var(--space-lg);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--danger);
-  color: white;
-  padding: var(--space-md) var(--space-xl);
-  border-radius: var(--radius-full);
-  font-weight: 500;
-  z-index: 1000;
-  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
-}
-
-@media (max-width: 640px) {
-  .notification {
-    width: 90%;
-    padding: var(--space-sm) var(--space-md);
-    font-size: 0.875rem;
-    top: var(--space-md);
-  }
-
-  .error-toast {
-    width: 90%;
-    padding: var(--space-sm) var(--space-md);
-    font-size: 0.875rem;
-    top: var(--space-md);
-    text-align: center;
-  }
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 4px) var(--space-md) 4px;
+  background: var(--warning);
+  color: #000;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  z-index: 1200;
 }

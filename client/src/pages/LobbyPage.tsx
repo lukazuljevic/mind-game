@@ -1,16 +1,26 @@
 import { GameRoom, Player } from '../types';
+import { shareInvite } from '../utils/device';
 import './LobbyPage.css';
+
+const MAX_PLAYERS = 8;
 
 interface LobbyPageProps {
   room: GameRoom;
   player: Player;
   onStartGame: () => void;
   onLeaveRoom: () => void;
+  onNotify: (message: string) => void;
 }
 
-function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
+function LobbyPage({ room, player, onStartGame, onLeaveRoom, onNotify }: LobbyPageProps) {
   const isHost = player.isHost;
   const canStart = room.players.length >= 2;
+
+  const handleShare = async () => {
+    const result = await shareInvite(room.code);
+    if (result === 'copied') onNotify('Invite link copied');
+    if (result === 'failed') onNotify(`Tell your friends the code: ${room.code}`);
+  };
 
   return (
     <div className="lobby-page">
@@ -19,19 +29,19 @@ function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
           ← Leave
         </button>
 
-        <div className="room-header">
+        <button className="room-header" onClick={handleShare}>
           <div className="room-code-label">Room Code</div>
-          <div className="room-code">{room.code}</div>
-          <p className="room-code-hint">Share this with your friends!</p>
-        </div>
+          <div className="lobby-room-code">{room.code}</div>
+          <div className="share-hint">Tap to share invite link</div>
+        </button>
 
         <div className="players-section card">
-          <h3>Players ({room.players.length})</h3>
+          <h3>Players ({room.players.length}/{MAX_PLAYERS})</h3>
           <div className="players-list">
             {room.players.map((p) => (
-              <div 
-                key={p.id} 
-                className={`player-item ${p.id === player.id ? 'is-me' : ''}`}
+              <div
+                key={p.id}
+                className={`player-item ${p.id === player.id ? 'is-me' : ''} ${p.connected ? '' : 'is-offline'}`}
               >
                 <div className="player-avatar">
                   {p.name.charAt(0).toUpperCase()}
@@ -41,8 +51,9 @@ function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
                     {p.name}
                     {p.id === player.id && <span className="you-badge">(You)</span>}
                   </span>
-                  {p.isHost && <span className="host-badge">Host</span>}
+                  {!p.connected && <span className="offline-text">Reconnecting…</span>}
                 </div>
+                {p.isHost && <span className="host-badge">Host</span>}
               </div>
             ))}
           </div>
@@ -50,27 +61,29 @@ function LobbyPage({ room, player, onStartGame, onLeaveRoom }: LobbyPageProps) {
 
         <div className="lobby-actions">
           {isHost ? (
-            <button 
+            <button
               className="btn btn-primary btn-large"
               onClick={onStartGame}
               disabled={!canStart}
             >
-              {canStart ? 'Start Game' : 'Need at least 2 players'}
+              {canStart ? 'Start Game' : 'Waiting for at least 2 players'}
             </button>
           ) : (
             <div className="waiting-for-host">
               <div className="spinner"></div>
-              <span>Waiting for host to start...</span>
+              <span>Waiting for host to start…</span>
             </div>
           )}
         </div>
 
         <div className="game-rules card">
-          <h4>Game Rules</h4>
+          <h4>How to play</h4>
           <ul>
-            <li>Play cards in ascending order (1-100)</li>
-            <li>Each level adds more cards per player</li>
-            <li>Complete all 12 levels to win!</li>
+            <li>No talking! Play cards in ascending order (1–100)</li>
+            <li>At level N, everyone gets N cards</li>
+            <li>You can only play your lowest card. Tap it when it feels right</li>
+            <li>Tap “I'm ready” together before each level</li>
+            <li>Beat {room.state.maxLevel} levels to win (12 for 2 players, 10 for 3, 8 for 4+)</li>
           </ul>
         </div>
       </div>

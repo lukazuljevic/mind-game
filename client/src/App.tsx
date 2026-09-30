@@ -1,185 +1,130 @@
-import { useState, useCallback } from 'react';
-import { useSocket } from './hooks/useSocket';
-import { GameRoom, Player, Screen, RoomInfo } from './types';
+import { useState, useCallback, useRef, useMemo } from 'react';
+import { getPlayerId, useSocket } from './hooks/useSocket';
+import { GameRoom, LastPlay, Mistake, RoomInfo } from './types';
+import { vibrate } from './utils/device';
 import HomePage from './pages/HomePage';
 import LobbyPage from './pages/LobbyPage';
 import GamePage from './pages/GamePage';
 import './App.css';
 
-function App() {
-  const [screen, setScreen] = useState<Screen>('home');
-  const [room, setRoom] = useState<GameRoom | null>(null);
-  const [player, setPlayer] = useState<Player | null>(null);
-  const [availableRooms, setAvailableRooms] = useState<RoomInfo[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [notification, setNotification] = useState<string | null>(null);
+interface Toast {
+  message: string;
+  kind: 'info' | 'error';
+}
 
-  const showNotification = useCallback((message: string) => {
-    setNotification(message);
-    setTimeout(() => setNotification(null), 3000);
+function App() {
+  const myId = useMemo(getPlayerId, []);
+  const [room, setRoom] = useState<GameRoom | null>(null);
+  const [availableRooms, setAvailableRooms] = useState<RoomInfo[]>([]);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [mistake, setMistake] = useState<Mistake | null>(null);
+  const [completedLevel, setCompletedLevel] = useState<number | null>(null);
+  const [lastPlay, setLastPlay] = useState<LastPlay | null>(null);
+
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const playCounterRef = useRef(0);
+  const roomRef = useRef(room);
+  roomRef.current = room;
+
+  const player = room?.players.find((p) => p.id === myId) ?? null;
+  const screen = room && player ? (room.state.status === 'waiting' ? 'lobby' : 'game') : 'home';
+
+  const showToast = useCallback((message: string, kind: Toast['kind'] = 'info') => {
+    clearTimeout(toastTimerRef.current);
+    setToast({ message, kind });
+    toastTimerRef.current = setTimeout(() => setToast(null), kind === 'error' ? 4000 : 3000);
   }, []);
 
-  const socket = useSocket({
-    onRoomCreated: (roomCode, createdPlayer) => {
-      setRoom({
-        code: roomCode,
-        players: [{ ...createdPlayer, fails: 0 }],
-        state: {
-          status: 'waiting',
-          level: 1,
-          playedCards: [],
-          currentCard: null,
-          isLocked: false,
-        },
-        hostId: createdPlayer.id,
-        createdAt: Date.now(),
-      });
-      setPlayer(createdPlayer);
-      setScreen('lobby');
-      setError(null);
+  const clearRoundInfo = () => {
+    setMistake(null);
+    setCompletedLevel(null);
+  };
+
+  const socket = useSocket(myId, {
+    onSession: (sessionRoom) => {
+      if (sessionRoom) {
+        setRoom(sessionRoom);
+      } else if (roomRef.current) {
+        setRoom(null);
+        clearRoundInfo();
+        showToast('You were disconnected for too long and left the room', 'error');
+      }
     },
     onRoomJoined: (joinedRoom) => {
       setRoom(joinedRoom);
-      const me = joinedRoom.players[joinedRoom.players.length - 1];
-      setPlayer(me);
-      setScreen('lobby');
-      setError(null);
+      clearRoundInfo();
+      // Drop ?room= so a reload doesn't reopen the join form
+      if (window.location.search) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     },
-    onPlayerJoined: (newPlayer) => {
-      setRoom((prev) => {
-        if (!prev) return prev;
-        return { ...prev, players: [...prev.players, newPlayer] };
-      });
-      showNotification(`${newPlayer.name} joined the game!`);
+    onPlayerJoined: (updatedRoom, newPlayer) => {
+      setRoom(updatedRoom);
+      showToast(`${newPlayer.name} joined`);
     },
-    onPlayerLeft: (playerId) => {
-      setRoom((prev) => {
-        if (!prev) return prev;
-        const leftPlayer = prev.players.find((p) => p.id === playerId);
-        if (leftPlayer) {
-          showNotification(`${leftPlayer.name} left the game`);
-        }
-        return {
-          ...prev,
-          players: prev.players.filter((p) => p.id !== playerId),
-        };
-      });
+    onPlayerLeft: (updatedRoom, playerName, newHostName) => {
+      setRoom(updatedRoom);
+      showToast(newHostName ? `${playerName} left · ${newHostName} is now the host` : `${playerName} left`);
     },
-    onHostChanged: (newHostId, newHostName) => {
-      setRoom((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          hostId: newHostId,
-          players: prev.players.map((p) => ({
-            ...p,
-            isHost: p.id === newHostId,
-          })),
-        };
-      });
-      setPlayer((prev) => {
-        if (!prev) return prev;
-        return { ...prev, isHost: prev.id === newHostId };
-      });
-      showNotification(`${newHostName} is now the host`);
-    },
-    onRoomsList: (rooms) => {
-      setAvailableRooms(rooms);
-    },
+    onRoomsList: setAvailableRooms,
     onGameStarted: (startedRoom) => {
       setRoom(startedRoom);
-      const me = startedRoom.players.find((p) => p.id === player?.id);
-      if (me) setPlayer(me);
-      setScreen('game');
+      clearRoundInfo();
+      setLastPlay(null);
     },
-    onCardPlayed: (_playerId, card, updatedRoom) => {
+    onCardPlayed: (updatedRoom, playerId, card) => {
       setRoom(updatedRoom);
-      const me = updatedRoom.players.find((p) => p.id === player?.id);
-      if (me) setPlayer(me);
-      showNotification(`Card ${card} played!`);
+      setLastPlay({ id: ++playCounterRef.current, playerId, card });
     },
-    onLevelComplete: (updatedRoom) => {
-      const me = updatedRoom.players.find((p) => p.id === player?.id);
-      if (me) setPlayer(me);
-      showNotification(`🎉 Level ${updatedRoom.state.level - 1} complete!`);
+    onLifeLost: (updatedRoom, playerId, playedCard, lostCards) => {
       setRoom(updatedRoom);
+      setMistake({ playerId, playedCard, lostCards });
+      setCompletedLevel(null);
+      vibrate(250);
     },
-    onLifeLost: (updatedRoom, lostCards) => {
-      const me = updatedRoom.players.find((p) => p.id === player?.id);
-      if (me) setPlayer(me);
-      showNotification(`You lost! Cards ${lostCards.join(', ')} were skipped.`);
+    onLevelComplete: (updatedRoom, level) => {
+      setRoom(updatedRoom);
+      setMistake(null);
+      setCompletedLevel(level);
+      vibrate([80, 60, 80]);
     },
     onGameOver: (updatedRoom, won) => {
       setRoom(updatedRoom);
-      if (won) {
-        showNotification('🏆 You won! Dobro ste se sitili!');
-      } else {
-        showNotification('💀 Game Over! Try again.');
-      }
+      vibrate(won ? [80, 60, 80, 60, 160] : 400);
     },
     onGameStateSync: (syncedRoom) => {
       setRoom(syncedRoom);
-      const me = syncedRoom.players.find((p) => p.id === player?.id);
-      if (me) setPlayer(me);
-      
-      if (syncedRoom.state.status === 'lost' && screen === 'game') {
-        showNotification('💀 Game Over - not enough players');
+      if (syncedRoom.state.status === 'playing' && !syncedRoom.state.isLocked) {
+        clearRoundInfo();
       }
     },
-    onError: (message) => {
-      setError(message);
-      setTimeout(() => setError(null), 4000);
-    },
+    onError: (message) => showToast(message, 'error'),
   });
 
-  const handleCreateRoom = (playerName: string) => {
-    socket.createRoom(playerName);
-  };
-
-  const handleJoinRoom = (roomCode: string, playerName: string) => {
-    socket.joinRoom(roomCode, playerName);
-  };
-
-  const handleStartGame = () => {
-    if (room) {
-      socket.startGame(room.code);
-    }
-  };
-
-  const handlePlayCard = () => {
-    if (room) {
-      socket.playCard(room.code);
-    }
-  };
-
   const handleLeaveRoom = () => {
-    if (room) {
-      socket.leaveRoom(room.code);
-    }
+    socket.leaveRoom();
     setRoom(null);
-    setPlayer(null);
-    setScreen('home');
+    clearRoundInfo();
+    setLastPlay(null);
   };
 
   return (
     <div className="app">
-      {notification && (
-        <div className="notification">
-          {notification}
-        </div>
+      {room && !socket.connected && (
+        <div className="connection-banner">Reconnecting…</div>
       )}
-      
-      {error && (
-        <div className="error-toast animate-slideUp">
-          {error}
+
+      {toast && (
+        <div key={toast.message} className={toast.kind === 'error' ? 'error-toast' : 'notification'} role="status">
+          {toast.message}
         </div>
       )}
 
       {screen === 'home' && (
         <HomePage
           availableRooms={availableRooms}
-          onCreateRoom={handleCreateRoom}
-          onJoinRoom={handleJoinRoom}
+          onCreateRoom={socket.createRoom}
+          onJoinRoom={socket.joinRoom}
         />
       )}
 
@@ -187,8 +132,9 @@ function App() {
         <LobbyPage
           room={room}
           player={player}
-          onStartGame={handleStartGame}
+          onStartGame={socket.startGame}
           onLeaveRoom={handleLeaveRoom}
+          onNotify={showToast}
         />
       )}
 
@@ -196,7 +142,13 @@ function App() {
         <GamePage
           room={room}
           player={player}
-          onPlayCard={handlePlayCard}
+          mistake={mistake}
+          completedLevel={completedLevel}
+          lastPlay={lastPlay}
+          onReady={socket.setReady}
+          onPlayCard={socket.playCard}
+          onPlayAgain={socket.startGame}
+          onReturnToLobby={socket.returnToLobby}
           onLeaveRoom={handleLeaveRoom}
         />
       )}

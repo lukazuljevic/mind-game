@@ -1,9 +1,12 @@
+export type GameStatus = 'waiting' | 'ready' | 'playing' | 'won' | 'lost';
+
 export interface Player {
   id: string;
   name: string;
   cards: number[];
   isHost: boolean;
   fails: number;
+  connected: boolean;
 }
 
 export interface GameRoom {
@@ -12,34 +15,35 @@ export interface GameRoom {
   state: GameState;
   hostId: string;
   createdAt: number;
+  lastActivityAt: number;
 }
 
 export interface GameState {
-  status: 'waiting' | 'playing' | 'won' | 'lost';
+  status: GameStatus;
   level: number;
+  maxLevel: number;
   playedCards: number[];
   currentCard: number | null;
   isLocked: boolean;
+  readyPlayers: string[];
 }
 
 export interface RoomInfo {
   code: string;
   hostName: string;
   playerCount: number;
-  status: 'waiting' | 'playing' | 'won' | 'lost';
 }
 
 export interface ServerToClientEvents {
-  'room-created': (data: { roomCode: string; player: Player }) => void;
+  'session': (data: { room: GameRoom | null }) => void;
   'room-joined': (data: { room: GameRoom }) => void;
-  'player-joined': (data: { player: Player }) => void;
-  'player-left': (data: { playerId: string }) => void;
-  'host-changed': (data: { newHostId: string; newHostName: string }) => void;
+  'player-joined': (data: { room: GameRoom; player: Player }) => void;
+  'player-left': (data: { room: GameRoom; playerName: string; newHostName?: string }) => void;
   'rooms-list': (data: { rooms: RoomInfo[] }) => void;
   'game-started': (data: { room: GameRoom }) => void;
-  'card-played': (data: { playerId: string; card: number; room: GameRoom }) => void;
-  'level-complete': (data: { room: GameRoom }) => void;
-  'life-lost': (data: { room: GameRoom; lostCards: number[] }) => void;
+  'card-played': (data: { room: GameRoom; playerId: string; card: number }) => void;
+  'life-lost': (data: { room: GameRoom; playerId: string; playedCard: number; lostCards: number[] }) => void;
+  'level-complete': (data: { room: GameRoom; completedLevel: number }) => void;
   'game-over': (data: { room: GameRoom; won: boolean }) => void;
   'game-state-sync': (data: { room: GameRoom }) => void;
   'error': (data: { message: string }) => void;
@@ -48,9 +52,13 @@ export interface ServerToClientEvents {
 export interface ClientToServerEvents {
   'create-room': (data: { playerName: string }) => void;
   'join-room': (data: { roomCode: string; playerName: string }) => void;
-  'start-game': (data: { roomCode: string }) => void;
-  'play-card': (data: { roomCode: string }) => void;
-  'leave-room': (data: { roomCode: string }) => void;
-  'request-sync': (data: { roomCode: string }) => void;
-  'get-rooms': () => void;
+  'start-game': () => void;
+  'player-ready': () => void;
+  'play-card': () => void;
+  'return-to-lobby': () => void;
+  'leave-room': () => void;
+}
+
+export interface SocketData {
+  playerId: string;
 }

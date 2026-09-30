@@ -1,120 +1,86 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { GameRoom, Player, RoomInfo } from '../types';
+import { ClientToServerEvents, GameRoom, Player, RoomInfo, ServerToClientEvents } from '../types';
 
-const SOCKET_URL = window.location.origin
-
-interface ServerToClientEvents {
-  'room-created': (data: { roomCode: string; player: Player }) => void;
-  'room-joined': (data: { room: GameRoom }) => void;
-  'player-joined': (data: { player: Player }) => void;
-  'player-left': (data: { playerId: string }) => void;
-  'host-changed': (data: { newHostId: string; newHostName: string }) => void;
-  'rooms-list': (data: { rooms: RoomInfo[] }) => void;
-  'game-started': (data: { room: GameRoom }) => void;
-  'card-played': (data: { playerId: string; card: number; room: GameRoom }) => void;
-  'level-complete': (data: { room: GameRoom }) => void;
-  'life-lost': (data: { room: GameRoom; lostCards: number[] }) => void;
-  'game-over': (data: { room: GameRoom; won: boolean }) => void;
-  'game-state-sync': (data: { room: GameRoom }) => void;
-  'error': (data: { message: string }) => void;
-}
-
-interface ClientToServerEvents {
-  'create-room': (data: { playerName: string }) => void;
-  'join-room': (data: { roomCode: string; playerName: string }) => void;
-  'start-game': (data: { roomCode: string }) => void;
-  'play-card': (data: { roomCode: string }) => void;
-  'leave-room': (data: { roomCode: string }) => void;
-  'request-sync': (data: { roomCode: string }) => void;
-  'get-rooms': () => void;
-}
+const SOCKET_URL = window.location.origin;
+const PLAYER_ID_KEY = 'mind-player-id';
 
 type SocketType = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+function randomId(): string {
+  // crypto.randomUUID only exists in secure contexts (https/localhost), not on http://192.168.x.x
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * A stable id for this tab, so a reload or reconnect keeps the player's seat.
+ * sessionStorage (not localStorage) so two tabs on one device are two different players.
+ */
+export function getPlayerId(): string {
+  try {
+    let id = sessionStorage.getItem(PLAYER_ID_KEY);
+    if (!id) {
+      id = randomId();
+      sessionStorage.setItem(PLAYER_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return randomId();
+  }
+}
+
 interface UseSocketProps {
-  onRoomCreated?: (roomCode: string, player: Player) => void;
+  onSession?: (room: GameRoom | null) => void;
   onRoomJoined?: (room: GameRoom) => void;
-  onPlayerJoined?: (player: Player) => void;
-  onPlayerLeft?: (playerId: string) => void;
-  onHostChanged?: (newHostId: string, newHostName: string) => void;
+  onPlayerJoined?: (room: GameRoom, player: Player) => void;
+  onPlayerLeft?: (room: GameRoom, playerName: string, newHostName?: string) => void;
   onRoomsList?: (rooms: RoomInfo[]) => void;
   onGameStarted?: (room: GameRoom) => void;
-  onCardPlayed?: (playerId: string, card: number, room: GameRoom) => void;
-  onLevelComplete?: (room: GameRoom) => void;
-  onLifeLost?: (room: GameRoom, lostCards: number[]) => void;
+  onCardPlayed?: (room: GameRoom, playerId: string, card: number) => void;
+  onLifeLost?: (room: GameRoom, playerId: string, playedCard: number, lostCards: number[]) => void;
+  onLevelComplete?: (room: GameRoom, completedLevel: number) => void;
   onGameOver?: (room: GameRoom, won: boolean) => void;
   onGameStateSync?: (room: GameRoom) => void;
   onError?: (message: string) => void;
 }
 
-export function useSocket(props: UseSocketProps) {
+export function useSocket(playerId: string, props: UseSocketProps) {
   const socketRef = useRef<SocketType | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     const socket: SocketType = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
+      auth: { playerId },
     });
     socketRef.current = socket;
 
-    socket.on('room-created', ({ roomCode, player }) => {
-      propsRef.current.onRoomCreated?.(roomCode, player);
-    });
+    socket.on('connect', () => setConnected(true));
+    socket.on('disconnect', () => setConnected(false));
 
-    socket.on('room-joined', ({ room }) => {
-      propsRef.current.onRoomJoined?.(room);
-    });
-
-    socket.on('player-joined', ({ player }) => {
-      propsRef.current.onPlayerJoined?.(player);
-    });
-
-    socket.on('player-left', ({ playerId }) => {
-      propsRef.current.onPlayerLeft?.(playerId);
-    });
-
-    socket.on('host-changed', ({ newHostId, newHostName }) => {
-      propsRef.current.onHostChanged?.(newHostId, newHostName);
-    });
-
-    socket.on('rooms-list', ({ rooms }) => {
-      propsRef.current.onRoomsList?.(rooms);
-    });
-
-    socket.on('game-started', ({ room }) => {
-      propsRef.current.onGameStarted?.(room);
-    });
-
-    socket.on('card-played', ({ playerId, card, room }) => {
-      propsRef.current.onCardPlayed?.(playerId, card, room);
-    });
-
-    socket.on('level-complete', ({ room }) => {
-      propsRef.current.onLevelComplete?.(room);
-    });
-
-    socket.on('life-lost', ({ room, lostCards }) => {
-      propsRef.current.onLifeLost?.(room, lostCards);
-    });
-
-    socket.on('game-over', ({ room, won }) => {
-      propsRef.current.onGameOver?.(room, won);
-    });
-
-    socket.on('game-state-sync', ({ room }) => {
-      propsRef.current.onGameStateSync?.(room);
-    });
-
-    socket.on('error', ({ message }) => {
-      propsRef.current.onError?.(message);
-    });
+    socket.on('session', ({ room }) => propsRef.current.onSession?.(room));
+    socket.on('room-joined', ({ room }) => propsRef.current.onRoomJoined?.(room));
+    socket.on('player-joined', ({ room, player }) => propsRef.current.onPlayerJoined?.(room, player));
+    socket.on('player-left', ({ room, playerName, newHostName }) =>
+      propsRef.current.onPlayerLeft?.(room, playerName, newHostName));
+    socket.on('rooms-list', ({ rooms }) => propsRef.current.onRoomsList?.(rooms));
+    socket.on('game-started', ({ room }) => propsRef.current.onGameStarted?.(room));
+    socket.on('card-played', ({ room, playerId, card }) => propsRef.current.onCardPlayed?.(room, playerId, card));
+    socket.on('life-lost', ({ room, playerId, playedCard, lostCards }) =>
+      propsRef.current.onLifeLost?.(room, playerId, playedCard, lostCards));
+    socket.on('level-complete', ({ room, completedLevel }) =>
+      propsRef.current.onLevelComplete?.(room, completedLevel));
+    socket.on('game-over', ({ room, won }) => propsRef.current.onGameOver?.(room, won));
+    socket.on('game-state-sync', ({ room }) => propsRef.current.onGameStateSync?.(room));
+    socket.on('error', ({ message }) => propsRef.current.onError?.(message));
 
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [playerId]);
 
   const createRoom = useCallback((playerName: string) => {
     socketRef.current?.emit('create-room', { playerName });
@@ -124,38 +90,34 @@ export function useSocket(props: UseSocketProps) {
     socketRef.current?.emit('join-room', { roomCode, playerName });
   }, []);
 
-  const startGame = useCallback((roomCode: string) => {
-    socketRef.current?.emit('start-game', { roomCode });
+  const startGame = useCallback(() => {
+    socketRef.current?.emit('start-game');
   }, []);
 
-  const playCard = useCallback((roomCode: string) => {
-    socketRef.current?.emit('play-card', { roomCode });
+  const setReady = useCallback(() => {
+    socketRef.current?.emit('player-ready');
   }, []);
 
-  const leaveRoom = useCallback((roomCode: string) => {
-    socketRef.current?.emit('leave-room', { roomCode });
+  const playCard = useCallback(() => {
+    socketRef.current?.emit('play-card');
   }, []);
 
-  const requestSync = useCallback((roomCode: string) => {
-    socketRef.current?.emit('request-sync', { roomCode });
+  const returnToLobby = useCallback(() => {
+    socketRef.current?.emit('return-to-lobby');
   }, []);
 
-  const getRooms = useCallback(() => {
-    socketRef.current?.emit('get-rooms');
-  }, []);
-
-  const getSocketId = useCallback(() => {
-    return socketRef.current?.id;
+  const leaveRoom = useCallback(() => {
+    socketRef.current?.emit('leave-room');
   }, []);
 
   return {
+    connected,
     createRoom,
     joinRoom,
     startGame,
+    setReady,
     playCard,
+    returnToLobby,
     leaveRoom,
-    requestSync,
-    getRooms,
-    getSocketId,
   };
 }

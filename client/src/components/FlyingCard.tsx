@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Card from './Card';
+
+const DURATION_MS = 350;
 
 interface FlyingCardProps {
   startRect: DOMRect;
@@ -8,40 +10,47 @@ interface FlyingCardProps {
   onComplete: () => void;
 }
 
+/** A card that flies from where it was played to the pile, animated with transforms only. */
 const FlyingCard = ({ startRect, endRect, number, onComplete }: FlyingCardProps) => {
-  const [style, setStyle] = useState<React.CSSProperties>({
-    position: 'fixed',
-    top: startRect.top,
-    left: startRect.left,
-    width: startRect.width,
-    height: startRect.height,
-    zIndex: 1000,
-    transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
-    pointerEvents: 'none',
-  });
+  const [arrived, setArrived] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
-    requestAnimationFrame(() => {
-      setStyle({
+    let frame = requestAnimationFrame(() => {
+      // Second frame so the start position is painted before transitioning
+      frame = requestAnimationFrame(() => setArrived(true));
+    });
+    const timer = setTimeout(() => onCompleteRef.current(), DURATION_MS);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer);
+    };
+  }, []);
+
+  const dx = startRect.left + startRect.width / 2 - (endRect.left + endRect.width / 2);
+  const dy = startRect.top + startRect.height / 2 - (endRect.top + endRect.height / 2);
+  const scale = Math.min(startRect.width / endRect.width, 1);
+
+  return (
+    <div
+      style={{
         position: 'fixed',
         top: endRect.top,
         left: endRect.left,
         width: endRect.width,
         height: endRect.height,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 1000,
-        transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)', 
         pointerEvents: 'none',
-        transform: 'rotate(5deg) scale(1.1)', 
-      });
-    });
-
-    const timer = setTimeout(onComplete, 600); 
-    return () => clearTimeout(timer);
-  }, [endRect, onComplete]);
-
-  return (
-    <div style={style}>
-      <Card number={number} played />
+        transition: `transform ${DURATION_MS}ms cubic-bezier(0.2, 0.8, 0.2, 1)`,
+        transform: arrived ? 'none' : `translate(${dx}px, ${dy}px) scale(${scale})`,
+        willChange: 'transform',
+      }}
+    >
+      <Card number={number} size="large" />
     </div>
   );
 };

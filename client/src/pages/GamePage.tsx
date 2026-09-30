@@ -1,5 +1,6 @@
-import { GameRoom, Player } from '../types';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useLayoutEffect } from 'react';
+import { GameRoom, LastPlay, Mistake, Player } from '../types';
+import { useWakeLock } from '../utils/device';
 import Card from '../components/Card';
 import FlyingCard from '../components/FlyingCard';
 import './GamePage.css';
@@ -7,96 +8,105 @@ import './GamePage.css';
 interface GamePageProps {
   room: GameRoom;
   player: Player;
+  mistake: Mistake | null;
+  completedLevel: number | null;
+  lastPlay: LastPlay | null;
+  onReady: () => void;
   onPlayCard: () => void;
+  onPlayAgain: () => void;
+  onReturnToLobby: () => void;
   onLeaveRoom: () => void;
 }
 
-function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
+interface Flight {
+  id: number;
+  startRect: DOMRect;
+  endRect: DOMRect;
+  card: number;
+}
+
+function GamePage({
+  room,
+  player,
+  mistake,
+  completedLevel,
+  lastPlay,
+  onReady,
+  onPlayCard,
+  onPlayAgain,
+  onReturnToLobby,
+  onLeaveRoom,
+}: GamePageProps) {
   const { state } = room;
   const otherPlayers = room.players.filter((p) => p.id !== player.id);
-  const myCards = player.cards;
-  const canPlay = myCards.length > 0 && state.status === 'playing' && !state.isLocked;
+  const [playableCard, ...restCards] = player.cards;
+  const isReadyPhase = state.status === 'ready';
   const isGameOver = state.status === 'won' || state.status === 'lost';
+  const canPlay = playableCard !== undefined && state.status === 'playing' && !state.isLocked;
+  const amReady = state.readyPlayers.includes(player.id);
   const totalFails = room.players.reduce((sum, p) => sum + p.fails, 0);
+  const levelCleared =
+    state.status === 'playing' && state.isLocked && !mistake && room.players.every((p) => p.cards.length === 0);
 
-  const myHandRef = useRef<HTMLDivElement>(null);
+  const [confirmExit, setConfirmExit] = useState(false);
+  const [flight, setFlight] = useState<Flight | null>(null);
+
+  const playSlotRef = useRef<HTMLDivElement>(null);
   const playPileRef = useRef<HTMLDivElement>(null);
   const otherPlayerRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  
-  const [flyingCards, setFlyingCards] = useState<{
-    id: number;
-    startRect: DOMRect;
-    endRect: DOMRect;
-    card: number;
-  }[]>([]);
+  const handledPlayRef = useRef(lastPlay?.id);
 
-  const prevCardRef = useRef<number | null>(null);
+  useWakeLock(!isGameOver);
 
-  useEffect(() => {
-    const currentCard = state.currentCard;
-    const prevCard = prevCardRef.current;
-    
-    if (currentCard !== null && currentCard !== prevCard) {
-    
+  // Layout effect so the flight starts before the pile paints the new card
+  useLayoutEffect(() => {
+    if (!lastPlay || lastPlay.id === handledPlayRef.current) return;
+    handledPlayRef.current = lastPlay.id;
+
+    const source = lastPlay.playerId === player.id
+      ? playSlotRef.current
+      : otherPlayerRefs.current[lastPlay.playerId];
+    const target = playPileRef.current;
+    if (!source || !target) return;
+
+    setFlight({
+      id: lastPlay.id,
+      startRect: source.getBoundingClientRect(),
+      endRect: target.getBoundingClientRect(),
+      card: lastPlay.card,
+    });
+  }, [lastPlay, player.id]);
+
+  // While a card is in flight, the pile keeps showing the card under it
+  const playedCount = state.playedCards.length;
+  const pileIndex = flight && state.currentCard === flight.card ? playedCount - 2 : playedCount - 1;
+  const pileCard = pileIndex >= 0 ? state.playedCards[pileIndex] : null;
+  const trail = state.playedCards.slice(Math.max(0, pileIndex - 3), Math.max(0, pileIndex));
+
+  const nameOf = (id: string) =>
+    id === player.id ? 'You' : room.players.find((p) => p.id === id)?.name ?? 'Someone';
+  const notReady = room.players.filter((p) => !state.readyPlayers.includes(p.id));
+
+  const handleExit = () => {
+    if (isGameOver) {
+      onLeaveRoom();
+    } else {
+      setConfirmExit(true);
     }
-    prevCardRef.current = currentCard;
-  }, [state.currentCard]);
-
-  const prevRoomRef = useRef<GameRoom>(room);
-  
-  useEffect(() => {
-    const prevRoom = prevRoomRef.current;
-    const currentCard = room.state.currentCard;
-    
-    if (currentCard && currentCard !== prevRoom.state.currentCard) {
-      let sourceRect: DOMRect | null = null;
-      let targetRect = playPileRef.current?.getBoundingClientRect();
-
-      const myPrevCards = prevRoom.players.find(p => p.id === player.id)?.cards || [];
-      const myCurrentCards = player.cards;
-      
-      if (myPrevCards.includes(currentCard) && !myCurrentCards.includes(currentCard)) {
-        sourceRect = myHandRef.current?.getBoundingClientRect() || null;
-      } else {
-        const otherPlayer = room.players.find(p => {
-           if (p.id === player.id) return false;
-           const prevP = prevRoom.players.find(pp => pp.id === p.id);
-           return prevP && prevP.cards.length > p.cards.length;
-        });
-        
-        if (otherPlayer) {
-           sourceRect = otherPlayerRefs.current[otherPlayer.id]?.getBoundingClientRect() || null;
-        }
-      }
-
-      if (sourceRect && targetRect) {
-         const newFlyingCard = {
-           id: Date.now(),
-           startRect: sourceRect,
-           endRect: targetRect,
-           card: currentCard
-         };
-         setFlyingCards(prev => [...prev, newFlyingCard]);
-      }
-    }
-    
-    prevRoomRef.current = room;
-  }, [room, player.id]);
-
-  const removeFlyingCard = (id: number) => {
-    setFlyingCards(prev => prev.filter(fc => fc.id !== id));
   };
 
   return (
     <div className="game-page">
       <div className="game-header">
-        <button className="back-button" onClick={onLeaveRoom}>
+        <button className="back-button" onClick={handleExit}>
           ← Exit
         </button>
         <div className="game-stats">
           <div className="stat">
             <span className="stat-label">Level</span>
-            <span className="stat-value">{state.level}</span>
+            <span className="stat-value">
+              {state.level}<span className="stat-max">/{state.maxLevel}</span>
+            </span>
           </div>
           <div className="stat">
             <span className="stat-label">Fails</span>
@@ -105,108 +115,221 @@ function GamePage({ room, player, onPlayCard, onLeaveRoom }: GamePageProps) {
         </div>
       </div>
 
-      <div className="game-board">
-        <div className="other-players">
-          {otherPlayers.map((p) => (
-            <div 
-              key={p.id} 
-              className="other-player"
-              ref={el => otherPlayerRefs.current[p.id] = el}
-            >
-              <div className="player-avatar-small">
-                {p.name.charAt(0).toUpperCase()}
-                {p.fails > 0 && <span className="fail-badge">{p.fails}</span>}
-              </div>
-              <span className="player-name-small">{p.name}</span>
-              <div className="card-count">
-                {p.cards.length} {p.cards.length === 1 ? 'card' : 'cards'}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="play-area">
-          <div 
-            className={`play-pile ${state.currentCard ? 'has-card' : ''}`}
-            ref={playPileRef}
+      <div className="other-players">
+        {otherPlayers.map((p) => (
+          <div
+            key={p.id}
+            className={`other-player ${p.connected ? '' : 'is-offline'} ${mistake?.playerId === p.id ? 'is-culprit' : ''}`}
+            ref={(el) => (otherPlayerRefs.current[p.id] = el)}
           >
-            {state.currentCard !== null ? (
-              <Card number={state.currentCard} size="large" played />
+            <div className="player-avatar-small">
+              {p.name.charAt(0).toUpperCase()}
+              {p.fails > 0 && <span className="fail-badge">{p.fails}</span>}
+              {isReadyPhase && state.readyPlayers.includes(p.id) && <span className="ready-badge">✓</span>}
+            </div>
+            <span className="player-name-small">{p.name}</span>
+            <div className="card-count">
+              {!p.connected ? 'offline' : `${p.cards.length} ${p.cards.length === 1 ? 'card' : 'cards'}`}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="game-board">
+        {isReadyPhase ? (
+          <div className="ready-panel card animate-fadeIn">
+            {mistake ? (
+              <>
+                <div className="ready-title is-mistake">
+                  {nameOf(mistake.playerId)} played {mistake.playedCard} too early
+                </div>
+                <div className="skipped-cards">
+                  <span>Skipped:</span>
+                  {mistake.lostCards.map((c) => (
+                    <Card key={c} number={c} size="mini" danger />
+                  ))}
+                </div>
+                <p className="ready-subtitle">Level {state.level} is dealt again</p>
+              </>
+            ) : completedLevel ? (
+              <div className="ready-title">🎉 Level {completedLevel} complete!</div>
             ) : (
-              <div className="pile-placeholder">
-                <span>Play Cards Here</span>
-                <span className="pile-hint">1 → 100</span>
+              <div className="ready-title">Get ready</div>
+            )}
+
+            <p className="ready-level">
+              Level {state.level} of {state.maxLevel} · {state.level} {state.level === 1 ? 'card' : 'cards'} each
+            </p>
+
+            {amReady ? (
+              <div className="ready-waiting">
+                <div className="spinner"></div>
+                <span>Waiting for {notReady.map((p) => nameOf(p.id)).join(', ')}…</span>
               </div>
+            ) : (
+              <button className="btn btn-primary btn-large ready-button" onClick={onReady}>
+                I'm ready
+              </button>
             )}
           </div>
-          
-          {state.playedCards.length > 1 && (
-            <div className="played-count">
-              {state.playedCards.length} cards played
-            </div>
-          )}
-        </div>
+        ) : (
+          <div className="play-area">
+            {trail.length > 0 && (
+              <div className="played-trail" aria-label="Previously played cards">
+                {trail.map((c) => (
+                  <Card key={c} number={c} size="mini" />
+                ))}
+              </div>
+            )}
 
-        {isGameOver && (
-          <div className="game-over-overlay animate-fadeIn">
-            <div className="game-over-card card">
-              {state.status === 'won' ? (
-                <>
-                  <div className="game-over-icon">🏆</div>
-                  <h2>You Won!</h2>
-                  <p>Amazing synchronization! You completed all 12 levels.</p>
-                </>
+            <div
+              className={`play-pile ${pileCard !== null ? 'has-card' : ''} ${mistake ? 'pile-mistake' : ''} ${levelCleared ? 'pile-cleared' : ''}`}
+              ref={playPileRef}
+            >
+              {pileCard !== null ? (
+                <Card key={pileCard} number={pileCard} size="large" played danger={!!mistake && pileCard === mistake.playedCard} />
               ) : (
-                <>
-                  <div className="game-over-icon">💔</div>
-                  <h2>Game Over</h2>
-                  <p>You made it to level {state.level}. Try again!</p>
-                </>
+                <div className="pile-placeholder">
+                  <span>Play cards here</span>
+                  <span className="pile-hint">1 → 100</span>
+                </div>
               )}
-              <button className="btn btn-primary" onClick={onLeaveRoom}>
-                Back to Home
-              </button>
             </div>
+
+            {mistake ? (
+              <div className="mistake-info animate-fadeIn">
+                <span>{nameOf(mistake.playerId)} played too early! Skipped:</span>
+                <div className="skipped-cards">
+                  {mistake.lostCards.map((c) => (
+                    <Card key={c} number={c} size="mini" danger />
+                  ))}
+                </div>
+              </div>
+            ) : levelCleared ? (
+              <div className="level-cleared animate-fadeIn">🎉 Level {state.level} complete!</div>
+            ) : (
+              playedCount > 0 && (
+                <div className="played-count">{playedCount} played this level</div>
+              )
+            )}
           </div>
         )}
       </div>
 
       <div className="my-hand-section">
         <div className="hand-label">
-          Your Cards
-          {player.fails > 0 && <span className="my-fail-badge">{player.fails}</span>}
+          Your cards
+          {player.fails > 0 && <span className="my-fail-badge">{player.fails} {player.fails === 1 ? 'fail' : 'fails'}</span>}
+          {isReadyPhase && amReady && <span className="my-ready-badge">Ready ✓</span>}
         </div>
-        <div className="my-hand" ref={myHandRef}>
-          {myCards.length > 0 ? (
-            myCards.map((card, index) => (
-              <Card
-                key={card}
-                number={card}
-                isLowest={index === 0}
-                onClick={index === 0 ? onPlayCard : undefined}
-                disabled={!canPlay || index !== 0}
-              />
-            ))
+
+        {restCards.length > 0 && (
+          <div className="hand-rest">
+            {restCards.map((card) => (
+              <Card key={card} number={card} disabled />
+            ))}
+          </div>
+        )}
+
+        <div className="play-slot" ref={playSlotRef}>
+          {playableCard !== undefined ? (
+            <Card
+              key={playableCard}
+              number={playableCard}
+              size="play"
+              isLowest
+              onClick={onPlayCard}
+              disabled={!canPlay}
+            />
           ) : (
             <div className="no-cards">
-              {state.status === 'playing' ? 'All cards played!' : 'Waiting...'}
+              {state.status === 'playing' ? 'All your cards are played' : ''}
             </div>
           )}
         </div>
-        {canPlay && myCards.length > 0 && (
-          <p className="play-hint">Tap your lowest card when you feel it's time</p>
-        )}
+
+        <p className="play-hint">
+          {canPlay ? 'Tap your lowest card when it feels right' : ' '}
+        </p>
       </div>
-      
-      {flyingCards.map(fc => (
+
+      {isGameOver && (
+        <div className="game-over-overlay animate-fadeIn">
+          <div className="game-over-card card">
+            {state.status === 'won' ? (
+              <>
+                <div className="game-over-icon">🏆</div>
+                <h2>You Won!</h2>
+                <p>
+                  Amazing synchronization! All {state.maxLevel} levels completed with {totalFails}{' '}
+                  {totalFails === 1 ? 'fail' : 'fails'}.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="game-over-icon">💔</div>
+                <h2>Game Over</h2>
+                <p>Not enough players left. You reached level {state.level}.</p>
+              </>
+            )}
+            {player.isHost ? (
+              <div className="game-over-actions">
+                <button
+                  className="btn btn-primary"
+                  onClick={onPlayAgain}
+                  disabled={room.players.length < 2}
+                >
+                  {room.players.length < 2 ? 'Need 2+ players' : 'Play again'}
+                </button>
+                <button className="btn btn-secondary" onClick={onReturnToLobby}>
+                  Back to lobby
+                </button>
+              </div>
+            ) : (
+              <div className="game-over-actions">
+                <div className="ready-waiting">
+                  <div className="spinner"></div>
+                  <span>Waiting for the host…</span>
+                </div>
+                <button className="btn btn-secondary" onClick={onLeaveRoom}>
+                  Leave
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {confirmExit && (
+        <div className="game-over-overlay animate-fadeIn" onClick={() => setConfirmExit(false)}>
+          <div className="game-over-card card" onClick={(e) => e.stopPropagation()}>
+            <h2>Leave the game?</h2>
+            <p>
+              {otherPlayers.length < 2
+                ? 'The game will end for everyone.'
+                : 'Your cards will be removed and the level dealt again.'}
+            </p>
+            <div className="form-actions">
+              <button className="btn btn-secondary" onClick={() => setConfirmExit(false)}>
+                Stay
+              </button>
+              <button className="btn btn-danger" onClick={onLeaveRoom}>
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {flight && (
         <FlyingCard
-          key={fc.id}
-          number={fc.card}
-          startRect={fc.startRect}
-          endRect={fc.endRect}
-          onComplete={() => removeFlyingCard(fc.id)}
+          key={flight.id}
+          number={flight.card}
+          startRect={flight.startRect}
+          endRect={flight.endRect}
+          onComplete={() => setFlight(null)}
         />
-      ))}
+      )}
     </div>
   );
 }
